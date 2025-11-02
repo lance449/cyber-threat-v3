@@ -90,8 +90,8 @@ CSP114/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/lance449/cyber-threat-detection-using-machine-learning.git
-cd cyber-threat-detection-using-machine-learning
+git clone https://github.com/lance449/cyber-threat-v2.git
+cd cyber-threat-v2
 ```
 
 2. **Create and activate virtual environment (recommended)**
