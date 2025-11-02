@@ -1,0 +1,500 @@
+/* Enhanced table styling */
+.detection-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell;
+}
+
+/* Table base styles */
+.custom-table {
+  width: 100%;
+  background: white;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Table header */
+.custom-table thead th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Custom table styles */
+.custom-table {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.custom-table thead {
+  background-color: #f8f9fa;
+}
+
+.custom-table th {
+  border-bottom: 2px solid #dee2e6;
+  padding: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: #495057;
+}
+
+/* Table rows */
+.custom-table tr {
+  transition: background-color 0.15s ease;
+  border-left: 4px solid transparent;
+}
+
+.custom-table tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Severity indicators */
+.severity {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.severity-high {
+    background: #FFE8E8;
+    color: #D32F2F;
+    border: 1px solid #FFCDD2;
+}
+
+.severity-medium {
+    background: #FFF3E0;
+    color: #EF6C00;
+    border: 1px solid #FFE0B2;
+}
+
+.severity-low {
+    background: #E8F5E9;
+    color: #388E3C;
+    border: 1px solid #C8E6C9;
+}
+
+/* Severity-based row styling - Subtle, professional colors for SOC dashboard */
+.table-danger {
+  background-color: #FFEAEA !important; /* Light subtle red */
+  border-left-color: #ef4444 !important;
+}
+
+.table-warning {
+  background-color: #FFF7E6 !important; /* Soft light yellow */
+  border-left-color: #f97316 !important;
+}
+
+.table-success {
+  background-color: #E9F7EF !important; /* Very light mint green */
+  border-left-color: #22c55e !important;
+}
+
+/* Verification controls */
+.verification-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.verify-button {
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.verify-true {
+    background: #4CAF50;
+    color: white;
+}
+
+.verify-false {
+    background: #F44336;
+    color: white;
+}
+
+/* Filter section styles */
+.filters-section {
+  margin-bottom: 1.5rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  border: 1px solid #e2e8f0;
+}
+
+.filters-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.filters-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filters-title i {
+  color: #64748b;
+}
+
+.filter-select {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  color: #475569;
+  width: 100%;
+  cursor: pointer;
+  height: 38px;
+}
+
+.filter-select:hover {
+  border-color: #94a3b8;
+}
+
+.filter-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+/* Remove the model-specific styles since we're using standard dropdowns */
+.model-select-container,
+.filter-select.model-select,
+.model-filter-label,
+.model-instruction {
+  display: none;
+}
+
+.filter-select[multiple] {
+  min-height: 120px;
+}
+
+.filter-select[multiple] option {
+  padding: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: 4px;
+}
+
+.filter-select[multiple] option:checked {
+  background: #3b82f6 linear-gradient(0deg, #3b82f6 0%, #3b82f6 100%);
+  color: white;
+}
+
+.filter-instruction {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.filter-instruction i {
+  color: #3b82f6;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn.reset {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.filter-btn.reset:hover {
+  background: #e2e8f0;
+}
+
+/* Active filters */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+}
+
+.filter-label {
+  color: #64748b;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+}
+
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.filter-tag.attack-type {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #e9d5ff;
+}
+
+.filter-tag.severity.high {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.filter-tag.severity.medium {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.filter-tag.severity.low {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.filter-tag.verification.verified {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.filter-tag.verification.unverified {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.filter-tag.model {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.filter-tag.model .remove:hover {
+  color: #0369a1;
+}
+
+/* Risk level badge styles */
+.badge.risk-level {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+.badge.risk-level.high {
+  background-color: #ef4444 !important;
+  color: white;
+}
+
+.badge.risk-level.medium {
+  background-color: #f97316 !important;
+  color: white;
+}
+
+.badge.risk-level.low {
+  background-color: #22c55e !important;
+  color: white;
+}
+
+/* Attack type badge styles */
+.badge.attack-type {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 4px;
+  color: white;
+}
+
+.badge.attack-type.rootkit,
+.badge.attack-type.exploit,
+.badge.attack-type.virus {
+  background-color: #ef4444;
+}
+
+.badge.attack-type.hoax,
+.badge.attack-type.hacktool {
+  background-color: #f97316;
+}
+
+.badge.attack-type.benign,
+.badge.attack-type.class_9 {
+  background-color: #22c55e;
+}
+
+/* Verification button styles */
+.btn-group .btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+.btn-group .btn-success,
+.btn-group .btn-outline-success:hover {
+  background-color: #22c55e;
+  border-color: #16a34a;
+  color: white;
+}
+
+.btn-group .btn-outline-success {
+  color: #16a34a;
+  border-color: #16a34a;
+}
+
+.btn-group .btn-danger,
+.btn-group .btn-outline-danger:hover {
+  background-color: #ef4444;
+  border-color: #dc2626;
+  color: white;
+}
+
+.btn-group .btn-outline-danger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Table styles */
+.custom-table {
+  margin-top: 1rem;
+}
+
+.custom-table th {
+  background-color: #f8fafc;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.custom-table td {
+  padding: 1rem;
+  vertical-align: middle;
+}
+
+/* IP address style */
+.fw-bold {
+  font-weight: 500 !important;
+  color: #334155;
+}
+
+.text-muted {
+  color: #64748b !important;
+  font-size: 0.875rem;
+}
+
+/* Feature badge with tooltip styling */
+.custom-table .badge.bg-secondary {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.custom-table .badge.bg-secondary:hover {
+  background-color: #5a6268 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.custom-table .badge.bg-secondary .fa-info-circle {
+  transition: all 0.2s ease;
+}
+
+.custom-table .badge.bg-secondary:hover .fa-info-circle {
+  opacity: 1;
+  color: #ffd700;
+}
+
+/* Improve tooltip display for feature badges */
+.custom-table [title] {
+  cursor: help;
+  position: relative;
+}
+
+/* Feature details section styling */
+.bg-light .feature-details {
+  margin-top: 0.5rem;
+}
+
+.bg-light .feature-details .badge {
+  margin: 0.125rem;
+}
+
+/* Verification status column styling */
+.custom-table th:first-child {
+  text-align: center;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  background-color: #f8fafc;
+  z-index: 10;
+}
+
+.custom-table td:first-child {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Quick action verification buttons */
+.custom-table .btn-sm {
+  min-width: 28px;
+  padding: 2px 8px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.custom-table .btn-sm:hover {
+  transform: scale(1.1);
+}
+
+/* Verification status badge */
+.custom-table .badge[title] {
+  cursor: help;
+}

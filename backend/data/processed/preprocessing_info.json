@@ -1,0 +1,34 @@
+{
+  "feature_count": 90,
+  "scaler_type": "minmax",
+  "metadata_columns": [
+    "Flow ID",
+    "Src IP",
+    "Dst IP",
+    "Src Port",
+    "Dst Port",
+    "Timestamp"
+  ],
+  "label_classes": [
+    "Backdoor",
+    "Benign",
+    "Exploit",
+    "HackTool",
+    "Hoax",
+    "Rootkit",
+    "Trojan",
+    "Virus",
+    "Worm"
+  ],
+  "class_weights": {
+    "0": 0.2568152342796975,
+    "1": 3.253619651862697,
+    "2": 1.4433763459484426,
+    "3": 1.4439390657714244,
+    "4": 1.4856412770572418,
+    "5": 1.4377731769036117,
+    "6": 1.4522429892969693,
+    "7": 1.4793118241394103,
+    "8": 1.4701126106259739
+  }
+}

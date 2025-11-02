@@ -1,0 +1,148 @@
+# Cyber Threat Patterns for ACA + SVM Model
+# This file contains known attack signatures and malicious patterns
+# Each pattern should be on a separate line
+# Lines starting with # are comments
+
+# Malware Signatures
+malware_signature_1
+trojan_horse_pattern
+virus_signature_x
+worm_propagation
+rootkit_hidden
+backdoor_access
+keylogger_stealth
+ransomware_encrypt
+botnet_command
+spyware_collect
+
+# Attack Patterns
+sql_injection
+xss_script
+buffer_overflow
+privilege_escalation
+denial_of_service
+brute_force_attack
+credential_stuffing
+session_hijacking
+man_in_middle
+cross_site_request_forgery
+
+# Network Anomalies
+port_scanning
+network_sweep
+host_discovery
+service_enumeration
+vulnerability_scan
+penetration_test
+lateral_movement
+data_exfiltration
+command_control
+dns_tunneling
+
+# Protocol Anomalies
+invalid_http_header
+suspicious_tcp_flag
+anomalous_packet_size
+unusual_port_sequence
+protocol_violation
+malformed_request
+oversized_payload
+fragmented_attack
+timing_attack
+resource_exhaustion
+
+# Behavioral Patterns
+rapid_connection_attempts
+unusual_data_transfer
+encrypted_traffic_anomaly
+timing_attack_pattern
+resource_exhaustion_attack
+covert_channel
+steganography_hidden
+polymorphic_malware
+metamorphic_code
+obfuscated_payload
+
+# Specific Attack Vectors
+phishing_email
+social_engineering
+watering_hole_attack
+supply_chain_attack
+zero_day_exploit
+advanced_persistent_threat
+insider_threat
+credential_theft
+privilege_abuse
+data_leakage
+
+# Network Security Indicators
+suspicious_domain
+malicious_ip_address
+command_control_server
+botnet_infrastructure
+malware_distribution
+phishing_site
+exploit_kit
+cryptocurrency_mining
+tor_traffic
+proxy_abuse
+
+# Application Layer Attacks
+web_application_attack
+api_abuse
+injection_attack
+authentication_bypass
+authorization_flaw
+session_management_issue
+input_validation_failure
+business_logic_flaw
+configuration_error
+security_misconfiguration
+
+# Endpoint Security Threats
+fileless_malware
+memory_injection
+process_hollowing
+dll_hijacking
+registry_persistence
+scheduled_task_abuse
+service_manipulation
+driver_exploitation
+kernel_mode_attack
+hypervisor_escape
+
+# Data Protection Violations
+personal_data_access
+financial_data_theft
+intellectual_property_theft
+confidential_document_access
+customer_data_breach
+employee_record_access
+medical_record_access
+payment_card_data
+authentication_credential
+encryption_key_theft
+
+# Infrastructure Attacks
+cloud_misconfiguration
+container_escape
+kubernetes_abuse
+serverless_abuse
+iot_device_compromise
+industrial_control_system
+scada_attack
+smart_grid_attack
+automotive_hacking
+medical_device_attack
+
+# Emerging Threats
+ai_adversarial_attack
+quantum_cryptography_break
+deepfake_manipulation
+synthetic_identity_fraud
+cryptocurrency_theft
+nft_manipulation
+metaverse_exploitation
+blockchain_attack
+smart_contract_vulnerability
+defi_exploit
