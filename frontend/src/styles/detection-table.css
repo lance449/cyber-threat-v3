@@ -475,11 +475,33 @@
   left: 0;
   background-color: #f8fafc;
   z-index: 10;
+  min-width: 160px;
+  width: 160px;
+  padding: 1rem 0.5rem;
 }
 
 .custom-table td:first-child {
   text-align: center;
   vertical-align: middle;
+  min-width: 160px;
+  width: 160px;
+  background-color: inherit;
+}
+
+/* Ensure all content in verification column is properly centered */
+.custom-table td:first-child > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+}
+
+.custom-table td:first-child small,
+.custom-table td:first-child .fw-bold {
+  text-align: center !important;
+  display: block;
+  width: 100%;
 }
 
 /* Quick action verification buttons */
@@ -492,6 +514,61 @@
 
 .custom-table .btn-sm:hover {
   transform: scale(1.1);
+}
+
+/* Verification column buttons - larger and clearer */
+.custom-table td:first-child .btn {
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Outline buttons for unverified items - make them clearly look like action buttons */
+.custom-table td:first-child .btn-outline-success,
+.custom-table td:first-child .btn-outline-danger {
+  background-color: white;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+.custom-table td:first-child .btn-outline-success:hover {
+  background-color: #22c55e;
+  border-color: #22c55e;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+}
+
+.custom-table td:first-child .btn-outline-danger:hover {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+}
+
+.custom-table td:first-child .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.custom-table td:first-child .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Highlight unverified rows in verification column */
+.custom-table td:first-child:has(.btn-success:not(.btn-outline-success)),
+.custom-table td:first-child:has(.btn-danger:not(.btn-outline-danger)) {
+  background-color: #f8f9fa;
+}
+
+/* Make verified status more prominent */
+.custom-table td:first-child .fw-bold.text-success,
+.custom-table td:first-child .fw-bold.text-danger {
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
 }
 
 /* Verification status badge */

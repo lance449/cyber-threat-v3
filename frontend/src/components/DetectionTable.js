@@ -830,13 +830,15 @@ export default function DetectionTable() {
         <Table hover className="custom-table">
           <thead>
             <tr>
-              <th style={{ width: '80px' }}>
-                Verify
-                {unverifiedCount > 0 && (
-                  <span className="badge bg-warning ms-2" style={{ fontSize: '0.7rem' }}>
-                    {unverifiedCount} unverified
-                  </span>
-                )}
+              <th style={{ width: '160px', minWidth: '160px' }}>
+                <div className="d-flex flex-column align-items-center gap-1">
+                  <div className="fw-bold">Verification</div>
+                  {unverifiedCount > 0 && (
+                    <span className="badge bg-warning" style={{ fontSize: '0.7rem' }}>
+                      {unverifiedCount} pending
+                    </span>
+                  )}
+                </div>
               </th>
               <th>Attack IP</th>
               <th>Victim IP</th>
@@ -881,26 +883,88 @@ export default function DetectionTable() {
                         statusBadge = <span className="badge bg-warning" style={{ fontSize: '0.7rem' }} title="Pending verification">⚪</span>;
                       }
                       
-                      return (
-                        <div className="d-flex flex-column gap-1 align-items-center">
-                          {statusBadge}
-                          {/* Quick action buttons - always visible to allow changes */}
-                          <div className="d-flex gap-1">
+                      // Show verified status prominently, or show action buttons for unverified
+                      if (isVerified) {
+                        return (
+                          <div className="d-flex flex-column gap-2 align-items-center" style={{ padding: '0.75rem 0.5rem', width: '100%' }}>
+                            {/* Verified status - show prominently with solid button styling */}
+                            <div className="d-flex flex-column align-items-center gap-1" style={{ width: '100%' }}>
+                              {statusBadge}
+                              <div 
+                                className={`fw-bold ${verificationStatus === true ? 'text-success' : 'text-danger'}`}
+                                style={{ fontSize: '0.85rem', textAlign: 'center', width: '100%' }}
+                              >
+                                {verificationStatus === true ? 'Threat Confirmed' : 'False Positive'}
+                              </div>
+                              {/* Show what was verified with a visual indicator */}
+                              <div 
+                                className={`badge ${verificationStatus === true ? 'bg-success' : 'bg-danger'}`}
+                                style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', marginTop: '0.25rem' }}
+                              >
+                                {verificationStatus === true ? '✓ Verified' : '✗ False'}
+                              </div>
+                            </div>
+                            {/* Allow changing verification */}
                             <button
-                              className={`btn btn-sm ${isVerified && verificationStatus === true ? 'btn-success' : 'btn-outline-success'}`}
-                              style={{ padding: '2px 6px', fontSize: '0.75rem', lineHeight: '1' }}
-                              onClick={() => handleManualVerification(r.flow_id, true)}
-                              title="Confirm threat"
+                              className="btn btn-sm btn-outline-secondary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => {
+                                // Clear verification to allow re-verification
+                                setVerifications(prev => {
+                                  const updated = { ...prev };
+                                  delete updated[r.flow_id];
+                                  return updated;
+                                });
+                                // Also notify backend that verification was cleared
+                                fetch('http://localhost:5000/api/manual/verify', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json'
+                                  },
+                                  body: JSON.stringify({
+                                    verifications: [{
+                                      flow_id: r.flow_id,
+                                      is_threat: null // Clear verification
+                                    }]
+                                  })
+                                })
+                                .catch(error => console.error('Error clearing verification:', error));
+                              }}
+                              title="Clear and change verification"
                             >
-                              ✓
+                              Change
+                            </button>
+                          </div>
+                        );
+                      }
+                      
+                      // Unverified - show action buttons clearly
+                      return (
+                        <div className="d-flex flex-column gap-2 align-items-center" style={{ padding: '0.75rem 0.5rem', width: '100%' }}>
+                          {/* Status indicator */}
+                          <div className="d-flex flex-column align-items-center gap-1" style={{ width: '100%' }}>
+                            {statusBadge}
+                            <small className="text-muted fw-bold" style={{ fontSize: '0.75rem', textAlign: 'center', width: '100%', display: 'block' }}>
+                              Needs Review
+                            </small>
+                          </div>
+                          {/* Action buttons - use outline style for unverified items */}
+                          <div className="d-flex flex-column gap-1 w-100" style={{ maxWidth: '130px' }}>
+                            <button
+                              className="btn btn-outline-success"
+                              style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', fontWeight: '600', width: '100%', borderWidth: '2px' }}
+                              onClick={() => handleManualVerification(r.flow_id, true)}
+                              title="Click to confirm this is a real threat"
+                            >
+                              ✓ Confirm Threat
                             </button>
                             <button
-                              className={`btn btn-sm ${isVerified && verificationStatus === false ? 'btn-danger' : 'btn-outline-danger'}`}
-                              style={{ padding: '2px 6px', fontSize: '0.75rem', lineHeight: '1' }}
+                              className="btn btn-outline-danger"
+                              style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', fontWeight: '600', width: '100%', borderWidth: '2px' }}
                               onClick={() => handleManualVerification(r.flow_id, false)}
-                              title="Mark as false"
+                              title="Click to mark as false positive"
                             >
-                              ✗
+                              ✗ False Positive
                             </button>
                           </div>
                         </div>
