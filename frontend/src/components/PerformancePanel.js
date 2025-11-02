@@ -2,7 +2,10 @@ import React from 'react';
 import { Card, Row, Col, Badge, Button, ButtonGroup } from 'react-bootstrap';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
+// Import jspdf-autotable - it extends jsPDF prototype when imported as side-effect
 import 'jspdf-autotable';
+// Also import as default for function call pattern
+import autoTable from 'jspdf-autotable';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ComposedChart, Bar, Line
@@ -49,12 +52,43 @@ const generatePDFReport = (data) => {
   doc.setFontSize(10);
   doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 25);
   
-  doc.autoTable({
-    head: [Object.keys(data[0])],
-    body: data.map(row => Object.values(row)),
-    startY: 35,
-    theme: 'grid'
-  });
+  // Use autoTable - try multiple patterns for compatibility
+  try {
+    // Pattern 1: If autoTable extends jsPDF prototype (v3.x + v5.x)
+    if (typeof doc.autoTable === 'function') {
+      doc.autoTable({
+        head: [Object.keys(data[0])],
+        body: data.map(row => Object.values(row)),
+        startY: 35,
+        theme: 'grid'
+      });
+    }
+    // Pattern 2: If autoTable is a function (v5.x default export)
+    else if (typeof autoTable === 'function') {
+      autoTable(doc, {
+        head: [Object.keys(data[0])],
+        body: data.map(row => Object.values(row)),
+        startY: 35,
+        theme: 'grid'
+      });
+    }
+    // Pattern 3: Fallback - use default export with function call
+    else if (autoTable && typeof autoTable.default === 'function') {
+      autoTable.default(doc, {
+        head: [Object.keys(data[0])],
+        body: data.map(row => Object.values(row)),
+        startY: 35,
+        theme: 'grid'
+      });
+    }
+    else {
+      throw new Error('autoTable function not available');
+    }
+  } catch (error) {
+    console.error('Error generating PDF table:', error);
+    doc.text('Error: PDF table generation failed', 14, 40);
+    doc.text('Please check console for details', 14, 50);
+  }
   
   doc.save(`model-performance-${new Date().toISOString().slice(0,10)}.pdf`);
 };
