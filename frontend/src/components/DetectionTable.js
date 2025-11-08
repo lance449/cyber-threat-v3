@@ -389,6 +389,7 @@ export default function DetectionTable() {
     'Aho–Corasick + SVM': { accuracy: 0, verified: 0 }
   }); // Add state for performance stats
   const [expandedRows, setExpandedRows] = useState({});
+  const [analysisTimers, setAnalysisTimers] = useState({}); // Track analysis time per threat
 
   // computed stats for PerformancePanel
   const totalDetected = rows.length;
@@ -406,13 +407,57 @@ export default function DetectionTable() {
   const detectionAccuracy = algoPositives > 0 ? Math.round((verifiedTrue / algoPositives) * 100) : 0;
   const manualPrecision = totalVerified > 0 ? Math.round((verifiedTrue / totalVerified) * 100) : 0;
 
+  // Start analysis timer when user expands row (starts reviewing threat)
+  const handleRowExpand = (flowId) => {
+    setExpandedRows(prev => {
+      const isExpanding = !prev[flowId];
+      
+      // Start timer when user expands row (starts reviewing)
+      if (isExpanding && !analysisTimers[flowId]) {
+        setAnalysisTimers(prevTimers => ({
+          ...prevTimers,
+          [flowId]: {
+            startTime: Date.now(),
+            isActive: true
+          }
+        }));
+      }
+      
+      return {
+        ...prev,
+        [flowId]: !prev[flowId]
+      };
+    });
+  };
+
   const handleManualVerification = (flowId, isVerified) => {
     setVerifications(prev => ({
       ...prev,
       [flowId]: isVerified
     }));
 
-    // Make API call to backend
+    // Calculate analysis time (Solution 1: Auto-start timer on user interaction)
+    let analysisTime = 0;
+    if (analysisTimers[flowId]) {
+      const timer = analysisTimers[flowId];
+      const endTime = Date.now();
+      const elapsed = (endTime - timer.startTime) / 1000; // Convert to seconds
+      
+      // Minimum 2 seconds (Solution 6: Minimum threshold to prevent accidental clicks)
+      analysisTime = Math.max(elapsed, 2);
+      
+      // Remove timer after use
+      setAnalysisTimers(prev => {
+        const newTimers = { ...prev };
+        delete newTimers[flowId];
+        return newTimers;
+      });
+    } else {
+      // If user verifies without expanding row, use default minimum time
+      analysisTime = 2;
+    }
+
+    // Make API call to backend with analysis_time
     fetch('http://localhost:5000/api/manual/verify', {
       method: 'POST',
       headers: {
@@ -421,7 +466,8 @@ export default function DetectionTable() {
       body: JSON.stringify({
         verifications: [{
           flow_id: flowId,
-          is_threat: isVerified
+          is_threat: isVerified,
+          analysis_time: analysisTime // Send analysis time to backend
         }]
       })
     })
@@ -457,7 +503,7 @@ export default function DetectionTable() {
       if (r && r.success) {
         setRunning(true);
         await fetchOne();
-        timerRef.current = setInterval(fetchOne, 2000);
+        timerRef.current = setInterval(fetchOne, 5000);
       } else {
         console.error('resetStream failed', r);
       }
@@ -873,6 +919,25 @@ export default function DetectionTable() {
                         );
                       }
                       
+                      // Check if threat is benign - don't show verification buttons for benign
+                      // For accuracy/precision calculation, we only verify threats detected as threats (not benign)
+                      const attackType = String(r.attack_type || r.attack_label || '').trim().toLowerCase();
+                      const isBenign = attackType === 'benign';
+                      
+                      if (isBenign) {
+                        return (
+                          <div className="text-center">
+                            <span className="badge bg-info" style={{ fontSize: '0.7rem' }} title="Benign traffic - no verification needed for accuracy calculation">
+                              🟢 Benign
+                            </span>
+                            <br />
+                            <small className="text-muted" style={{ fontSize: '0.65rem' }}>
+                              Not verifiable
+                            </small>
+                          </div>
+                        );
+                      }
+                      
                       // Show status badge
                       let statusBadge;
                       if (isVerified && verificationStatus === true) {
@@ -1052,10 +1117,7 @@ export default function DetectionTable() {
                     <Button
                       size="sm"
                       variant="outline-primary"
-                      onClick={() => setExpandedRows(prev => ({
-                        ...prev,
-                        [r.flow_id]: !prev[r.flow_id]
-                      }))}
+                      onClick={() => handleRowExpand(r.flow_id)}
                     >
                       {expandedRows[r.flow_id] ? '▼ Hide' : '► Show'} Features
                     </Button>

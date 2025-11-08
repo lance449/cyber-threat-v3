@@ -3,6 +3,8 @@ import './styles/App.css';
 import DetectionTable from './components/DetectionTable';
 import RiskAnalysisReport from './components/RiskAnalysisReport';
 import AttackFrequencyReport from './components/AttackFrequencyReport';
+import ReliabilityComparisonPanel from './components/ReliabilityComparisonPanel';
+import EfficiencyComparisonPanel from './components/EfficiencyComparisonPanel';
 import { Nav, Tab, Container, Row, Col } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -102,6 +104,16 @@ function App() {
                     📊 Attack Frequency Report
                   </Nav.Link>
                 </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link eventKey="reliability-comparison">
+                    ✅ Reliability Comparison
+                  </Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link eventKey="efficiency-comparison">
+                    ⚡ Efficiency Comparison
+                  </Nav.Link>
+                </Nav.Item>
               </Nav>
               
               <Tab.Content>
@@ -120,6 +132,16 @@ function App() {
                 <Tab.Pane eventKey="attack-frequency">
                   <div className="tab-content">
                     <AttackFrequencyReport />
+                  </div>
+                </Tab.Pane>
+                <Tab.Pane eventKey="reliability-comparison">
+                  <div className="tab-content">
+                    <ReliabilityComparisonPanel />
+                  </div>
+                </Tab.Pane>
+                <Tab.Pane eventKey="efficiency-comparison">
+                  <div className="tab-content">
+                    <EfficiencyComparisonPanel />
                   </div>
                 </Tab.Pane>
               </Tab.Content>

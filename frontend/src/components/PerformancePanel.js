@@ -2,9 +2,7 @@ import React from 'react';
 import { Card, Row, Col, Badge, Button, ButtonGroup } from 'react-bootstrap';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
-// Import jspdf-autotable - it extends jsPDF prototype when imported as side-effect
 import 'jspdf-autotable';
-// Also import as default for function call pattern
 import autoTable from 'jspdf-autotable';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,

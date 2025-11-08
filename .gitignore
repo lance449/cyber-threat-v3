@@ -41,11 +41,29 @@ logs/
 Thumbs.db
 desktop.ini
 
-# Large data files (optional - uncomment if you don't want to commit large CSV files)
-# *.csv
-# data/raw/
-# data/consolidated/*.csv
+# Large data files - DO NOT COMMIT (causes corruption)
+*.csv
+backend/data/consolidated/*.csv
+backend/data/raw/
+backend/data/processed/*.csv
+backend/data/processed/*.joblib
+backend/data/processed/*.pkl
+
+# Model files - DO NOT COMMIT (binary files cause corruption)
+backend/models/**/*.joblib
+backend/models/**/*.pkl
+*.joblib
+*.pkl
 
 # Reports (generated files)
 reports/
 results/
+
+# Additional exclusions
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
