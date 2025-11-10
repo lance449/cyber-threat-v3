@@ -45,24 +45,49 @@ cd frontend
 npm install
 ```
 
-### 4. Prepare Data Files (If Needed)
+### 4. Prepare Data Files and Models
 
-The large CSV files and model files are NOT in the repository. You have two options:
+The large CSV files and model files are NOT in the repository. You have **TWO OPTIONS**:
 
-**Option A: Use existing data files** (if you have them)
-- Place CSV files in `backend/data/consolidated/`
-- Place model files in `backend/models/`
+#### **Option A: Copy Trained Models (RECOMMENDED - Faster) ⚡**
 
-**Option B: Generate new data and models**
-```bash
-cd backend
-python train_system_fixed.py
-```
+If you already have trained models on your main device, simply copy them:
 
-This will:
-- Process the data files (if available)
-- Train the models
-- Generate all necessary files
+**On your main device (where models are trained):**
+1. Copy the entire `backend/models/` folder
+2. Copy the `backend/data/processed/` folder (contains preprocessing objects)
+
+**On the new device:**
+1. Place the `models/` folder in `backend/models/`
+2. Place the `processed/` folder in `backend/data/processed/`
+
+**Advantages:**
+- ✅ No need for large CSV files on new device
+- ✅ No training time required
+- ✅ Faster setup
+- ✅ Same models = consistent results
+
+#### **Option B: Train Models on New Device (If you have CSV files)**
+
+If you have the CSV data files, you can train models on the new device:
+
+1. **Copy CSV files to new device:**
+   - Place CSV files in `backend/data/consolidated/`
+   - Example: `All_Network_Sample_Complete_100k.csv` or `All_Network_Sample_Complete.csv`
+
+2. **Train the models:**
+   ```bash
+   cd backend
+   python train_system_fixed.py
+   ```
+
+   This will:
+   - Process the CSV files
+   - Train all three models (ACA_RF, Fuzzy_RF, IntruDTree)
+   - Generate preprocessing objects
+   - Save models to `backend/models/`
+
+**Note:** Training can take significant time depending on dataset size and hardware.
 
 ### 5. Run the System
 
