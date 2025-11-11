@@ -584,10 +584,13 @@ class ACASVMModel:
         Returns:
             SVM model instance
         """
+        # Handle class_weight: convert None to None, 'balanced' to 'balanced', or keep as dict
+        class_weight_param = self.class_weight if self.class_weight != 'None' else None
+        
         if self.svm_type == 'linear':
             return LinearSVC(
                 C=self.C,
-                class_weight=self.class_weight,
+                class_weight=class_weight_param,
                 max_iter=self.max_iter,
                 tol=self.tol,
                 random_state=42
@@ -596,22 +599,26 @@ class ACASVMModel:
             return SGDClassifier(
                 loss='hinge',
                 alpha=1.0/self.C,
-                class_weight=self.class_weight,
+                class_weight=class_weight_param,
                 max_iter=self.max_iter,
                 tol=self.tol,
                 random_state=42
             )
-        else:  # kernel SVM
-            return SVC(
-                C=self.C,
-                kernel=self.kernel,
-                gamma=self.gamma,
-                class_weight=self.class_weight,
-                probability=True,
-                max_iter=self.max_iter,
-                tol=self.tol,
-                random_state=42
-            )
+        else:  # kernel SVM (svm_type == 'kernel')
+            # Use SVC for kernel-based SVM
+            svc_params = {
+                'C': self.C,
+                'kernel': self.kernel,
+                'gamma': self.gamma,
+                'class_weight': class_weight_param,
+                'max_iter': self.max_iter,
+                'tol': self.tol,
+                'random_state': 42
+            }
+            # Only add probability if it's not LinearSVC (which doesn't support it)
+            if self.kernel != 'linear':
+                svc_params['probability'] = True
+            return SVC(**svc_params)
     
     def _extract_aca_features(self, X: pd.DataFrame) -> np.ndarray:
         """
@@ -1030,7 +1037,23 @@ class ACASVMModel:
     
     def load_model(self, filepath: str):
         """Load a trained model"""
-        model_data = joblib.load(filepath)
+        # Try loading with better error handling for large models
+        try:
+            model_data = joblib.load(filepath)
+        except MemoryError as me:
+            logger.error(f"Memory error loading model: {me}")
+            logger.warning("Attempting to free memory and retry...")
+            import gc
+            gc.collect()
+            try:
+                model_data = joblib.load(filepath)
+            except MemoryError as me2:
+                logger.error(f"Still unable to load model: {me2}")
+                logger.error("Solutions: 1) Free memory, 2) Restart Python, 3) Retrain with smaller model")
+                raise MemoryError(f"Unable to allocate memory for model. File: {filepath}. Error: {me2}")
+        except Exception as e:
+            logger.error(f"Error loading model: {e}")
+            raise
         
         self.pipeline = model_data['pipeline']
         self.feature_names = model_data['feature_names']
@@ -1048,6 +1071,14 @@ class ACASVMModel:
         self.pattern_matcher.patterns = model_data['patterns']
         self.pattern_matcher.pattern_weights = model_data.get('pattern_weights', {})
         self.pattern_matcher.pattern_categories = model_data.get('pattern_categories', {})
+        
+        # Build the automaton after loading patterns (critical for predictions)
+        if self.pattern_matcher.patterns:
+            build_success = self.pattern_matcher.build_ac(self.pattern_matcher.patterns)
+            if not build_success:
+                logger.warning("Failed to build ACA automaton after loading model. Pattern matching may not work correctly.")
+        else:
+            logger.warning("No patterns found in loaded model. Pattern matching will not work.")
         
         # Recreate feature extractor
         self.feature_extractor = ACAFeatureExtractor(self.pattern_matcher)

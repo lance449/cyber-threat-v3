@@ -29,6 +29,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def get_optimized_config_for_balanced_dataset():
+    """Get optimized configuration specifically for balanced dataset (11k per class)
+    This configuration targets 80%+ accuracy while maintaining algorithm integrity"""
+    return {
+        'fuzzy_rf': {
+            'n_estimators': 500,        # More trees for better ensemble (target 80%+)
+            'max_depth': 35,            # Deeper trees to capture complex patterns
+            'min_samples_split': 2,     # Allow fine-grained splits
+            'min_samples_leaf': 1,       # Minimal leaf size for detailed patterns
+            'max_features': 'sqrt',     # Feature diversity per tree
+            'bootstrap': True,
+            'class_weight': None,       # No class weights needed (already balanced)
+            'max_samples': 1.0,          # Use all samples (balanced dataset)
+            'min_impurity_decrease': 0.0,  # No early stopping
+            'criterion': 'gini',        # Gini for multi-class
+            'ccp_alpha': 0.0,           # No cost-complexity pruning
+            'n_jobs': -1               # Use all cores
+            # Note: oob_score is hardcoded to True in RandomForestClassifier initialization
+        },
+        'intrudtree': {
+            'max_depth': 50,            # Very deep for complex patterns (target 80%+)
+            'min_samples_split': 2,      # Fine-grained splits
+            'min_samples_leaf': 1,       # Minimal leaf size
+            'prune_threshold': 0.0005,  # Very light pruning
+            'n_important_features': 60  # More features for better discrimination
+        },
+        'aca_svm': {
+            'svm_type': 'kernel',       # Use kernel SVM (non-linear)
+            'kernel': 'rbf',            # RBF kernel for non-linear patterns
+            'C': 50.0,                  # Higher C for better fit (target 80%+)
+            'gamma': 'scale',           # Scaled gamma for RBF
+            'class_weight': None,       # No class weights (balanced)
+            'max_iter': 10000,          # More iterations for convergence
+            'tol': 1e-5,                # Tighter tolerance for better precision
+            # Note: probability is handled internally in _create_svm_model for kernel SVMs
+            'patterns_file': 'data/patterns/cyber_threat_patterns.txt'
+        },
+        'ensemble': {
+            'ensemble_method': 'voting',  # Hard voting for balanced dataset
+            'meta_learner': 'logistic_regression',
+            'cv_folds': 5,              # More folds for better validation
+            'weights': [1.0, 1.3, 1.0]   # Weight IntruDTree more (best performer)
+        }
+    }
+
 def get_fast_mode_config(fast_mode=False):
     """Get model configuration based on fast mode setting"""
     if fast_mode:
@@ -69,45 +114,8 @@ def get_fast_mode_config(fast_mode=False):
             }
         }
     else:
-        # Optimized configuration for production
-        return {
-            'fuzzy_rf': {
-                'n_estimators': 150,     # Optimized for speed vs accuracy
-                'max_depth': 20,         # Deeper for better accuracy
-                'min_samples_split': 2,  # Less restrictive for better splits
-                'min_samples_leaf': 1,  # Less restrictive
-                'max_features': 'sqrt',  # Balanced feature selection
-                'bootstrap': True,
-                'class_weight': 'balanced',
-                'max_samples': 0.8,      # Use 80% of samples for speed
-                'min_impurity_decrease': 0.0,  # No early stopping
-                'criterion': 'gini',    # Use gini for better performance
-                'ccp_alpha': 0.0,       # No pruning for speed
-                'n_jobs': -1            # Use all CPU cores
-            },
-            'intrudtree': {
-                'max_depth': 20,        # Optimized depth for speed vs accuracy
-                'min_samples_split': 2, 
-                'min_samples_leaf': 1,
-                'prune_threshold': 0.005,  # Balanced pruning
-                'n_important_features': 30  # Optimized feature count
-            },
-            'aca_svm': {
-                'svm_type': 'linear',   # Use linear SVM for speed
-                'kernel': 'linear',     # Linear kernel for speed
-                'C': 1.0,              # Balanced regularization
-                'gamma': 'scale',       # Scale gamma
-                'class_weight': 'balanced',
-                'max_iter': 2000,       # Reduced iterations for speed
-                'tol': 1e-3,           # Relaxed tolerance for speed
-                'patterns_file': 'data/patterns/cyber_threat_patterns.txt'
-            },
-            'ensemble': {
-                'ensemble_method': 'voting',  # Use voting for speed
-                'meta_learner': 'logistic_regression',
-                'cv_folds': 3  # Reduced folds for speed
-            }
-        }
+        # Use optimized configuration for balanced dataset
+        return get_optimized_config_for_balanced_dataset()
 
 def main(args=None):
     """Main training function"""
@@ -119,14 +127,14 @@ def main(args=None):
     # Parse args
     if args is None:
         parser = argparse.ArgumentParser(description='Train Cyber Threat Detection System')
-        # Allow override via env var DATASET_PATH; fallback to default path
-        default_data_path = os.environ.get('DATASET_PATH', 'data/consolidated/All_Network_Sample_Complete_100k.csv')
+        # Allow override via env var DATASET_PATH; fallback to balanced dataset
+        default_data_path = os.environ.get('DATASET_PATH', 'data/consolidated/Network_Dataset_Balanced.csv')
         parser.add_argument('--data-path', default=default_data_path, help='Path to consolidated dataset CSV')
         parser.add_argument('--processed-dir', default='data/processed', help='Directory to store processed data')
         parser.add_argument('--models-dir', default='models', help='Directory to store models')
         parser.add_argument('--test-size', type=float, default=0.3, help='Test split size (0-1)')
         parser.add_argument('--scaler', choices=['minmax', 'standard'], default='minmax', help='Scaler type')
-        parser.add_argument('--sample-size', type=int, default=50000, help='Number of rows to sample (0 for full dataset)')
+        parser.add_argument('--sample-size', type=int, default=0, help='Number of rows to sample (0 for full dataset - recommended for balanced dataset)')
         parser.add_argument('--random-state', type=int, default=42, help='Random seed')
         parser.add_argument('--fast-mode', action='store_true', help='Enable fast training mode with reduced parameters')
         args = parser.parse_args()
@@ -139,14 +147,20 @@ def main(args=None):
     # Re-resolve with env var precedence if set (even when args provided)
     env_data = os.environ.get('DATASET_PATH')
     requested_data_path = resolve_path(env_data if env_data else args.data_path)
+    balanced_candidate = resolve_path('data/consolidated/Network_Dataset_Balanced.csv')
     sample_candidate = resolve_path('data/consolidated/All_Network_Sample_Complete.csv')
 
     chosen_data_path = requested_data_path
     if not os.path.exists(chosen_data_path):
-        default_complete = resolve_path('data/consolidated/All_Network_Complete.csv')
-        if requested_data_path == default_complete and os.path.exists(sample_candidate):
+        # First try balanced dataset, then fallback to sample
+        if os.path.exists(balanced_candidate):
+            logger.warning(f"Requested dataset not found: {requested_data_path}. Falling back to balanced dataset: {balanced_candidate}")
+            chosen_data_path = balanced_candidate
+        elif os.path.exists(sample_candidate):
             logger.warning(f"Requested dataset not found: {requested_data_path}. Falling back to sample: {sample_candidate}")
             chosen_data_path = sample_candidate
+        else:
+            logger.error(f"Dataset not found: {requested_data_path}. Also checked: {balanced_candidate}, {sample_candidate}")
 
     # Configuration
     config = {
@@ -158,7 +172,9 @@ def main(args=None):
         'scaler_type': args.scaler,
         'sample_size': None if args.sample_size == 0 else args.sample_size,
         'fast_mode': getattr(args, 'fast_mode', False),
-        'model_configs': get_fast_mode_config(getattr(args, 'fast_mode', False))
+        'model_configs': get_fast_mode_config(getattr(args, 'fast_mode', False)),
+        'use_feature_selection': True,  # Enable feature selection for better performance
+        'n_features_to_select': 50      # Select top 50 most discriminative features
     }
     
     # Log configuration mode

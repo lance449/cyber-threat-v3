@@ -348,7 +348,23 @@ class AdvancedEnsembleModel:
     
     def load_model(self, filepath: str):
         """Load ensemble model"""
-        model_data = joblib.load(filepath)
+        # Try loading with better error handling for large models
+        try:
+            model_data = joblib.load(filepath)
+        except MemoryError as me:
+            logger.error(f"Memory error loading model: {me}")
+            logger.warning("Attempting to free memory and retry...")
+            import gc
+            gc.collect()
+            try:
+                model_data = joblib.load(filepath)
+            except MemoryError as me2:
+                logger.error(f"Still unable to load model: {me2}")
+                logger.error("Solutions: 1) Free memory, 2) Restart Python, 3) Retrain with smaller model")
+                raise MemoryError(f"Unable to allocate memory for model. File: {filepath}. Error: {me2}")
+        except Exception as e:
+            logger.error(f"Error loading model: {e}")
+            raise
         
         self.ensemble_model = model_data['ensemble_model']
         self.ensemble_method = model_data['ensemble_method']

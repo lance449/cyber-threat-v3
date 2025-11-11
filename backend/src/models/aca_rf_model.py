@@ -458,7 +458,23 @@ class ACARandomForestModel:
     
     def load_model(self, filepath: str):
         """Load a trained model"""
-        model_data = joblib.load(filepath)
+        # Try loading with better error handling for large models
+        try:
+            model_data = joblib.load(filepath)
+        except MemoryError as me:
+            logger.error(f"Memory error loading model: {me}")
+            logger.warning("Attempting to free memory and retry...")
+            import gc
+            gc.collect()
+            try:
+                model_data = joblib.load(filepath)
+            except MemoryError as me2:
+                logger.error(f"Still unable to load model: {me2}")
+                logger.error("Solutions: 1) Free memory, 2) Restart Python, 3) Retrain with smaller model")
+                raise MemoryError(f"Unable to allocate memory for model. File: {filepath}. Error: {me2}")
+        except Exception as e:
+            logger.error(f"Error loading model: {e}")
+            raise
         
         self.rf_classifier = model_data['rf_classifier']
         self.feature_names = model_data['feature_names']

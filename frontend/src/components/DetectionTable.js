@@ -503,7 +503,7 @@ export default function DetectionTable() {
       if (r && r.success) {
         setRunning(true);
         await fetchOne();
-        timerRef.current = setInterval(fetchOne, 5000);
+        timerRef.current = setInterval(fetchOne, 1000);
       } else {
         console.error('resetStream failed', r);
       }

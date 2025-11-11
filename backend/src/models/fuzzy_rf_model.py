@@ -494,70 +494,82 @@ class FuzzyRandomForestModel:
             except:
                 logger.warning("Could not load class weights, using default")
         
-        # Apply AGGRESSIVE resampling to balance classes BEFORE training (like IntruDTree does)
-        from sklearn.utils import resample
-        
-        # Get class distribution
+        # Check if dataset is already balanced (for balanced datasets like Network_Dataset_Balanced.csv)
         class_counts = y_train.value_counts()
         max_count = class_counts.max()
         min_count = class_counts.min()
-        # MORE AGGRESSIVE: Upsample minority classes 3x instead of 2x
-        target_size = min_count * 3  # More aggressive upsampling for better threat detection
+        balance_ratio = min_count / max_count if max_count > 0 else 0
         
-        logger.info(f"Class distribution before balancing: {dict(class_counts)}")
-        logger.info(f"Target size for balancing: {target_size}")
+        # If dataset is already balanced (ratio > 0.9), skip resampling
+        is_already_balanced = balance_ratio > 0.9
         
-        # Resample to create balanced dataset
-        balanced_samples = []
-        balanced_labels = []
-        
-        for class_label in y_train.unique():
-            class_mask = y_train == class_label
-            class_X = X_combined[class_mask]
-            class_y = y_train[class_mask]
+        if is_already_balanced:
+            logger.info(f"Dataset is already balanced (ratio={balance_ratio:.3f}). Skipping resampling.")
+            logger.info(f"Class distribution: {dict(class_counts)}")
+            X_balanced = X_combined
+            y_balanced = y_train
             
-            if len(class_X) > target_size:
-                # Downsample majority class
-                class_X_resampled, class_y_resampled = resample(
-                    class_X, class_y, n_samples=target_size, random_state=42
-                )
+            # Use class_weight from config (None for balanced datasets)
+            if self.class_weight is not None:
+                logger.info(f"Using class_weight={self.class_weight} from configuration")
             else:
-                # Upsample minority class
-                class_X_resampled, class_y_resampled = resample(
-                    class_X, class_y, n_samples=target_size, random_state=42, replace=True
-                )
+                logger.info("No class weights needed (balanced dataset)")
+        else:
+            # Apply resampling only if dataset is imbalanced
+            from sklearn.utils import resample
             
-            balanced_samples.append(class_X_resampled)
-            balanced_labels.append(class_y_resampled)
+            logger.info(f"Dataset is imbalanced (ratio={balance_ratio:.3f}). Applying resampling.")
+            logger.info(f"Class distribution before balancing: {dict(class_counts)}")
+            
+            # Use target size based on median class size (more conservative)
+            target_size = int(class_counts.median())
+            
+            # Resample to create balanced dataset
+            balanced_samples = []
+            balanced_labels = []
+            
+            for class_label in y_train.unique():
+                class_mask = y_train == class_label
+                class_X = X_combined[class_mask]
+                class_y = y_train[class_mask]
+                
+                if len(class_X) > target_size:
+                    # Downsample majority class
+                    class_X_resampled, class_y_resampled = resample(
+                        class_X, class_y, n_samples=target_size, random_state=42
+                    )
+                else:
+                    # Upsample minority class
+                    class_X_resampled, class_y_resampled = resample(
+                        class_X, class_y, n_samples=target_size, random_state=42, replace=True
+                    )
+                
+                balanced_samples.append(class_X_resampled)
+                balanced_labels.append(class_y_resampled)
+            
+            # Combine balanced data
+            X_balanced = pd.concat(balanced_samples, ignore_index=True)
+            y_balanced = pd.concat(balanced_labels, ignore_index=True)
+            
+            logger.info(f"Balanced class distribution: {dict(y_balanced.value_counts())}")
+            
+            # Apply class weights if not explicitly set to None
+            if self.class_weight is None:
+                # Calculate balanced class weights for imbalanced data
+                unique_classes = y_train.unique()
+                n_samples_original = len(y_train)
+                n_classes = len(unique_classes)
+                
+                balanced_class_weights = {}
+                for cls in unique_classes:
+                    class_count_original = np.sum(y_train == cls)
+                    weight = n_samples_original / (n_classes * class_count_original)
+                    balanced_class_weights[cls] = weight
+                
+                self.rf_classifier.class_weight = balanced_class_weights
+                logger.info(f"Applied balanced class weights: {balanced_class_weights}")
         
-        # Combine balanced data
-        X_balanced = pd.concat(balanced_samples, ignore_index=True)
-        y_balanced = pd.concat(balanced_labels, ignore_index=True)
-        
-        logger.info(f"Balanced class distribution: {dict(y_balanced.value_counts())}")
-        
-        # FORCE class weights to be very aggressive toward minority classes
-        # Calculate aggressive weights based on ORIGINAL data distribution (before balancing)
-        unique_classes = y_train.unique()
-        n_samples_original = len(y_train)
-        n_classes = len(unique_classes)
-        
-        # Create very aggressive class weights that strongly favor minority classes
-        aggressive_class_weights = {}
-        for cls in unique_classes:
-            class_count_original = np.sum(y_train == cls)
-            # Calculate weight as: total_samples / (n_classes * class_count)
-            # This gives much higher weight to minority classes
-            weight = n_samples_original / (n_classes * class_count_original)
-            aggressive_class_weights[cls] = weight
-        
-        logger.info(f"Computed aggressive class weights (based on original data): {aggressive_class_weights}")
-        
-        # Apply aggressive weights
-        self.rf_classifier.class_weight = aggressive_class_weights
-        logger.info("Using AGGRESSIVE class weights for training to favor threat detection")
-        
-        # Train on BALANCED data with aggressive weights
+        # Train the model
         self.rf_classifier.fit(X_balanced, y_balanced)
         
         # Calculate training metrics
@@ -828,12 +840,35 @@ class FuzzyRandomForestModel:
             'class_weight': self.class_weight
         }
         
-        joblib.dump(model_data, filepath)
-        logger.info(f"Fuzzy + RF model saved to {filepath}")
+        # Use compression to reduce file size and improve loading
+        joblib.dump(model_data, filepath, compress=('gzip', 3))
+        logger.info(f"Fuzzy + RF model saved to {filepath} (compressed)")
     
     def load_model(self, filepath: str):
         """Load a trained model"""
-        model_data = joblib.load(filepath)
+        # Try loading with better error handling for large models
+        try:
+            # First try regular loading
+            model_data = joblib.load(filepath)
+        except MemoryError as me:
+            logger.error(f"Memory error loading model: {me}")
+            logger.warning("Attempting to free memory and retry...")
+            import gc
+            gc.collect()
+            try:
+                # Retry after garbage collection
+                model_data = joblib.load(filepath)
+            except MemoryError as me2:
+                logger.error(f"Still unable to load model: {me2}")
+                logger.error("Solutions:")
+                logger.error("1. Free up system memory (close other applications)")
+                logger.error("2. Restart Python/Python process")
+                logger.error("3. Retrain with smaller model (reduce n_estimators or max_depth)")
+                logger.error("4. Delete old model files and retrain")
+                raise MemoryError(f"Unable to allocate memory for model. File: {filepath}. Error: {me2}")
+        except Exception as e:
+            logger.error(f"Error loading model: {e}")
+            raise
         
         self.rf_classifier = model_data['rf_classifier']
         self.feature_names = model_data['feature_names']

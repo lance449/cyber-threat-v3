@@ -50,7 +50,7 @@ def initialize_orchestrator():
     """Initialize the orchestrator with trained models"""
     global orchestrator
     
-    dataset_path = os.environ.get('DATASET_PATH', 'data/consolidated/All_Network_Sample_Complete_100k.csv')
+    dataset_path = os.environ.get('DATASET_PATH', 'data/consolidated/Network_Dataset_Balanced.csv')
     config = {
         'data_path': dataset_path,  # Allow override via DATASET_PATH
         'processed_data_path': 'data/processed',
@@ -60,34 +60,36 @@ def initialize_orchestrator():
         'scaler_type': 'minmax',
         'model_configs': {
             'fuzzy_rf': {
-                'n_estimators': 200,
-                'max_depth': 30,  # Increased from 25 to 30 for deeper trees
-                'min_samples_split': 2,  # Reduced from 5 to 2 - more aggressive splits
-                'min_samples_leaf': 1,  # Reduced from 2 to 1 - more aggressive splits
-                'max_features': 'sqrt',
+                'n_estimators': 500,        # More trees for 80%+ accuracy
+                'max_depth': 35,            # Deeper trees for complex patterns
+                'min_samples_split': 2,     # Fine-grained splits
+                'min_samples_leaf': 1,      # Minimal leaf size
+                'max_features': 'sqrt',     # Feature diversity
                 'bootstrap': True,
-                'class_weight': 'balanced',
-                'max_samples': 0.8,
-                'min_impurity_decrease': 0.0,  # Reduced from 0.001 - allow more splits
+                'class_weight': None,       # No class weights (balanced dataset)
+                'max_samples': 1.0,        # Use all samples (balanced)
+                'min_impurity_decrease': 0.0,
                 'criterion': 'gini',
-                'ccp_alpha': 0.0,  # Reduced from 0.001 - less pruning
+                'ccp_alpha': 0.0,
                 'n_jobs': -1
+                # Note: oob_score is hardcoded to True in RandomForestClassifier initialization
             },
             'intrudtree': {
-                'max_depth': 50,
+                'max_depth': 50,            # Very deep for 80%+ accuracy
                 'min_samples_split': 2,
                 'min_samples_leaf': 1,
-                'prune_threshold': 0.001,
-                'n_important_features': 79
+                'prune_threshold': 0.0005,  # Very light pruning
+                'n_important_features': 60  # More features for discrimination
             },
             'aca_svm': {
-                'svm_type': 'linear',
-                'kernel': 'linear',
-                'C': 5.0,
-                'gamma': 'scale',
-                'class_weight': 'balanced',
-                'max_iter': 5000,
-                'tol': 1e-4,
+                'svm_type': 'kernel',       # Use kernel SVM for non-linear
+                'kernel': 'rbf',            # RBF kernel for better accuracy
+                'C': 50.0,                  # Higher C for 80%+ accuracy
+                'gamma': 'scale',           # Scaled gamma
+                'class_weight': None,       # No class weights (balanced)
+                'max_iter': 10000,          # More iterations
+                'tol': 1e-5,                # Tighter tolerance
+                # Note: probability is handled internally in _create_svm_model for kernel SVMs
                 'patterns_file': 'data/patterns/cyber_threat_patterns.txt'
             }
         }
@@ -121,9 +123,9 @@ def initialize_orchestrator():
                 logger.error(f"Failed to load existing processed data: {load_result['error']}")
                 return False
         else:
-            logger.warning("Processed data not found. Running preprocessing once on a sample for responsiveness...")
-            # Use a manageable sample size to avoid OOM on startup
-            orchestrator.config['sample_size'] = 100000
+            logger.warning("Processed data not found. Running preprocessing on balanced dataset...")
+            # Use full balanced dataset (no sampling needed since it's already balanced)
+            orchestrator.config['sample_size'] = None  # Use full dataset
             pre = orchestrator.preprocess_data()
             if not pre['success']:
                 logger.error(f"Preprocessing failed: {pre['error']}")
@@ -278,14 +280,32 @@ def detect():
                 accuracy = float(np.mean(predictions == y_sample.values))
                 threats_detected = int(np.sum(predictions != benign_idx))
                 actual_threats = int(np.sum(y_sample.values != benign_idx))
+                
+                # Debug: Log benign detection statistics
+                benign_predictions = int(np.sum(predictions == benign_idx))
+                actual_benign = int(np.sum(y_sample.values == benign_idx))
+                logger.info(f"{model_name} - Benign predictions: {benign_predictions}/{len(predictions)}, Actual benign: {actual_benign}/{len(y_sample)}")
+                
+                # Log prediction distribution for first few samples
+                if len(predictions) > 0:
+                    unique_preds, pred_counts = np.unique(predictions, return_counts=True)
+                    pred_dist = {int(unique_preds[i]): int(pred_counts[i]) for i in range(len(unique_preds))}
+                    logger.info(f"{model_name} - Prediction distribution: {pred_dist}")
+                    if label_encoder is not None:
+                        pred_labels = [label_encoder.classes_[int(p)] if int(p) < len(label_encoder.classes_) else f"Unknown_{int(p)}" for p in unique_preds]
+                        logger.info(f"{model_name} - Predicted classes: {pred_labels}")
+                
                 detection_results[model_name] = {
                     'predictions': predictions.tolist(),
                     'accuracy': accuracy,
                     'threats_detected': threats_detected,
                     'actual_threats': actual_threats,
+                    'benign_predictions': benign_predictions,
+                    'actual_benign': actual_benign,
                     'details': details
                 }
             except Exception as e:
+                logger.error(f"Error in {model_name} prediction: {e}")
                 detection_results[model_name] = {'error': str(e)}
 
         detection_time = time.time() - start_time
@@ -324,6 +344,18 @@ def detect():
                 except Exception as e:
                     logger.warning(f"Failed to extract IPs from metadata row {i}: {e}")
 
+            # Helper function to convert numeric label to string attack label (define early)
+            def get_attack_label_from_idx(label_idx):
+                if label_encoder is not None and hasattr(label_encoder, 'classes_') and label_idx < len(label_encoder.classes_):
+                    return label_encoder.classes_[label_idx]
+                else:
+                    # Fallback mapping (NOTE: This may not match actual label encoder order!)
+                    attack_mapping = {
+                        0: 'Backdoor', 1: 'Benign', 2: 'Exploit', 3: 'HackTool', 4: 'Hoax',
+                        5: 'Rootkit', 6: 'Trojan', 7: 'Virus', 8: 'Worm'
+                    }
+                    return attack_mapping.get(int(label_idx), f"Attack_{label_idx}")
+            
             # Get per-model predictions - ensure we get the correct prediction for this specific sample
             aca_pred = detection_results.get('ACA_SVM', {}).get('predictions', [])
             fuzzy_pred = detection_results.get('Fuzzy_RF', {}).get('predictions', [])
@@ -331,20 +363,38 @@ def detect():
             
             # Get the prediction for this specific sample index
             if len(aca_pred) > i:
-                aca_binary = 1 if aca_pred[i] != benign_idx else 0
+                aca_pred_idx = aca_pred[i]
+                aca_binary = 1 if aca_pred_idx != benign_idx else 0
+                # Debug logging for benign detection
+                if i < 5:  # Log first 5 samples
+                    aca_label = get_attack_label_from_idx(aca_pred_idx)
+                    logger.info(f"Sample {i} - ACA_SVM: predicted_idx={aca_pred_idx}, label='{aca_label}', benign_idx={benign_idx}, is_threat={aca_binary}")
             else:
                 # If no ACA predictions available, default to benign
                 aca_binary = 0
+                aca_pred_idx = benign_idx
             
             if len(fuzzy_pred) > i:
-                fuzzy_binary = 1 if fuzzy_pred[i] != benign_idx else 0
+                fuzzy_pred_idx = fuzzy_pred[i]
+                fuzzy_binary = 1 if fuzzy_pred_idx != benign_idx else 0
+                # Debug logging for benign detection
+                if i < 5:  # Log first 5 samples
+                    fuzzy_label = get_attack_label_from_idx(fuzzy_pred_idx)
+                    logger.info(f"Sample {i} - Fuzzy_RF: predicted_idx={fuzzy_pred_idx}, label='{fuzzy_label}', benign_idx={benign_idx}, is_threat={fuzzy_binary}")
             else:
                 fuzzy_binary = 0
+                fuzzy_pred_idx = benign_idx
                 
             if len(intrudtree_pred) > i:
-                intrudtree_binary = 1 if intrudtree_pred[i] != benign_idx else 0
+                intrudtree_pred_idx = intrudtree_pred[i]
+                intrudtree_binary = 1 if intrudtree_pred_idx != benign_idx else 0
+                # Debug logging for benign detection
+                if i < 5:  # Log first 5 samples
+                    intrudtree_label = get_attack_label_from_idx(intrudtree_pred_idx)
+                    logger.info(f"Sample {i} - IntruDTree: predicted_idx={intrudtree_pred_idx}, label='{intrudtree_label}', benign_idx={benign_idx}, is_threat={intrudtree_binary}")
             else:
                 intrudtree_binary = 0
+                intrudtree_pred_idx = benign_idx
             
             # Majority vote for ensemble
             votes = [aca_binary, fuzzy_binary, intrudtree_binary]
@@ -355,58 +405,45 @@ def detect():
             if label_encoder is not None and hasattr(label_encoder, 'classes_') and true_label_idx < len(label_encoder.classes_):
                 attack_label = label_encoder.classes_[true_label_idx]
             else:
-                # Map common attack types to readable names
-                attack_mapping = {
-                    0: 'Benign',
-                    1: 'DoS',
-                    2: 'DDoS', 
-                    3: 'Port Scan',
-                    4: 'Brute Force',
-                    5: 'Infiltration',
-                    6: 'Botnet',
-                    7: 'Web Attack',
-                    8: 'Exploit',
-                    9: 'Backdoor',
-                    10: 'Rootkit',
-                    11: 'Trojan',
-                    12: 'Virus',
-                    13: 'Worm',
-                    14: 'HackTool',
-                    15: 'Hoax'
-                }
-                attack_label = attack_mapping.get(int(true_label_idx), f"Attack_{true_label_idx}")
+                # Use the helper function for consistency
+                attack_label = get_attack_label_from_idx(true_label_idx)
 
-            # Enhanced severity mapping based on attack type and model agreement
-            severity = "Low"
+            # Real-world severity assessment (Attack Type Primary + Confidence Modifier)
+            high_inherent_severity = ['DoS', 'DDoS', 'Exploit', 'Rootkit', 'Trojan', 'Virus', 'Worm', 'Backdoor']
+            medium_inherent_severity = ['Port Scan', 'HackTool', 'Hoax', 'Botnet', 'Infiltration', 'Web Attack']
             
-            # High severity attacks (always high if detected by any model)
-            high_severity_attacks = ['DoS', 'DDoS', 'Exploit', 'Rootkit', 'Trojan', 'Virus', 'Worm', 'Backdoor']
-            medium_severity_attacks = ['Port Scan', 'HackTool', 'Hoax', 'Botnet', 'Infiltration', 'Web Attack']
+            threat_votes = sum(votes)
+            severity = "Low"  # Default
             
-            if attack_label in high_severity_attacks:
-                if sum(votes) >= 2:  # Majority agreement
-                    severity = "High"
-                elif sum(votes) == 1:  # Single model detection
-                    severity = "High"  # Still high for serious attacks
-                else:
-                    severity = "Medium"  # Even if no models detect, it's still concerning
-            elif attack_label in medium_severity_attacks:
-                if sum(votes) >= 2:
-                    severity = "Medium"
-                elif sum(votes) == 1:
-                    severity = "Medium"
-                else:
-                    severity = "Low"
+            # Step 1: Base severity from attack type (PRIMARY)
+            if attack_label in high_inherent_severity:
+                base_severity = "High"
+            elif attack_label in medium_inherent_severity:
+                base_severity = "Medium"
             elif attack_label == "Benign":
-                severity = "Low"
+                base_severity = "Low"
             else:
-                # Unknown attack types
-                if sum(votes) >= 2:
-                    severity = "Medium"
-                elif sum(votes) == 1:
-                    severity = "Low"
+                base_severity = "Medium"
+            
+            # Step 2: Adjust based on confidence (MODIFIER)
+            if base_severity == "High":
+                if threat_votes >= 2:
+                    severity = "High"
+                elif threat_votes == 1:
+                    severity = "High"  # Still High (dangerous attack type)
                 else:
-                    severity = "Low"
+                    severity = "Medium"  # No models - downgrade but concerning
+            elif base_severity == "Medium":
+                if threat_votes >= 3:
+                    severity = "High"  # All models agree - upgrade
+                elif threat_votes >= 2:
+                    severity = "Medium"
+                elif threat_votes == 1:
+                    severity = "Medium"
+                else:
+                    severity = "Low"  # No models - downgrade
+            else:  # Low (Benign)
+                severity = "Low"
 
             # Determine risk level based on ensemble prediction
             if ensemble_binary == 1:
@@ -418,25 +455,59 @@ def detect():
             else:
                 risk_level = "None"
 
-            # Get detection models that flagged this as threat
+            # Get detection models - include ALL models that made predictions (both threats and benign)
+            # This ensures we can see which models correctly identified benign traffic
             detection_models = []
-            if aca_binary == 1:
-                detection_models.append("ACA_SVM")
-            if fuzzy_binary == 1:
-                detection_models.append("Fuzzy_RF")
-            if intrudtree_binary == 1:
-                detection_models.append("IntruDTree")
+            benign_detection_models = []  # Models that correctly identified benign
+            
+            # Check each model's prediction
+            if len(aca_pred) > i:
+                if aca_binary == 1:
+                    detection_models.append("ACA_SVM")
+                elif attack_label == "Benign" and aca_pred_idx == benign_idx:
+                    # Model correctly identified benign
+                    benign_detection_models.append("ACA_SVM")
+            
+            if len(fuzzy_pred) > i:
+                if fuzzy_binary == 1:
+                    detection_models.append("Fuzzy_RF")
+                elif attack_label == "Benign" and fuzzy_pred_idx == benign_idx:
+                    # Model correctly identified benign
+                    benign_detection_models.append("Fuzzy_RF")
+            
+            if len(intrudtree_pred) > i:
+                if intrudtree_binary == 1:
+                    detection_models.append("IntruDTree")
+                elif attack_label == "Benign" and intrudtree_pred_idx == benign_idx:
+                    # Model correctly identified benign
+                    benign_detection_models.append("IntruDTree")
+            
+            # For benign traffic, show which models correctly identified it
+            # For threats, show which models detected it
+            if attack_label == "Benign":
+                # Show models that correctly predicted benign
+                model_used = ", ".join(benign_detection_models) if benign_detection_models else "None (all misclassified)"
+            else:
+                # Show models that detected the threat
+                model_used = ", ".join(detection_models) if detection_models else "Unknown"
             
             # Debug logging for model predictions (only log occasionally to avoid spam)
-            if i % 100 == 0:  # Log every 100th sample
-                logger.info(f"Sample {i} - ACA: {aca_binary}, Fuzzy: {fuzzy_binary}, IntruDTree: {intrudtree_binary}, Benign_idx: {benign_idx}")
+            if i < 5:  # Log first 5 samples in detail
+                logger.info(f"Sample {i} - True: '{attack_label}' (idx={true_label_idx}), ACA: {aca_binary} (idx={aca_pred_idx}), Fuzzy: {fuzzy_binary} (idx={fuzzy_pred_idx}), IntruDTree: {intrudtree_binary} (idx={intrudtree_pred_idx}), Benign_idx={benign_idx}")
+                if attack_label == "Benign":
+                    logger.info(f"  Benign detection models: {benign_detection_models}")
             
             # Enhanced risk analysis with model information
             threat_votes = sum(votes)
             total_models = len(votes)
             
             if attack_label == "Benign":
-                risk_analysis = "🟢 Low risk: Normal traffic confirmed"
+                if len(benign_detection_models) == 3:
+                    risk_analysis = "🟢 Low risk: Normal traffic confirmed by all models"
+                elif len(benign_detection_models) >= 1:
+                    risk_analysis = f"🟢 Low risk: Normal traffic confirmed by {len(benign_detection_models)}/{total_models} models"
+                else:
+                    risk_analysis = "⚠️ Warning: All models misclassified benign traffic as threat"
             elif threat_votes >= 2:
                 # Majority agreement
                 if severity == "High":
@@ -461,29 +532,19 @@ def detect():
                     risk_analysis = f"🟡 Low risk: {attack_label} detected (ground truth) - routine monitoring"
             
             # Add model details
-            if len(detection_models) > 0:
-                risk_analysis += f" | Detected by: {', '.join(detection_models)}"
-            
-            # Build model_used string
-            model_used = ", ".join(detection_models) if detection_models else "Unknown"
-            
-            # Helper function to convert numeric label to string attack label
-            def get_attack_label_from_idx(label_idx):
-                if label_encoder is not None and hasattr(label_encoder, 'classes_') and label_idx < len(label_encoder.classes_):
-                    return label_encoder.classes_[label_idx]
+            if attack_label == "Benign":
+                if len(benign_detection_models) > 0:
+                    risk_analysis += f" | Correctly identified by: {', '.join(benign_detection_models)}"
                 else:
-                    attack_mapping = {
-                        0: 'Benign', 1: 'DoS', 2: 'DDoS', 3: 'Brute Force', 4: 'Infiltration',
-                        5: 'Botnet', 6: 'Web Attack', 7: 'Exploit', 8: 'Backdoor',
-                        9: 'Rootkit', 10: 'Trojan', 11: 'Virus', 12: 'Worm',
-                        13: 'HackTool', 14: 'Hoax'
-                    }
-                    return attack_mapping.get(int(label_idx), f"Attack_{label_idx}")
+                    risk_analysis += f" | Misclassified by all models"
+            else:
+                if len(detection_models) > 0:
+                    risk_analysis += f" | Detected by: {', '.join(detection_models)}"
             
             # Store individual model predictions for accuracy calculation
-            aca_label_idx = aca_pred[i] if len(aca_pred) > i else benign_idx
-            fuzzy_label_idx = fuzzy_pred[i] if len(fuzzy_pred) > i else benign_idx
-            intrudtree_label_idx = intrudtree_pred[i] if len(intrudtree_pred) > i else benign_idx
+            aca_label_idx = aca_pred_idx
+            fuzzy_label_idx = fuzzy_pred_idx
+            intrudtree_label_idx = intrudtree_pred_idx
             
             model_predictions = {
                 'ACA_SVM': {
@@ -1124,6 +1185,22 @@ def _detect_for_row(X_row, true_label_idx=None, label_encoder=None, original_fea
             classes = list(label_encoder.classes_)
             if 'Benign' in classes:
                 benign_idx = classes.index('Benign')
+                logger.debug(f"_detect_for_row: Benign index determined as {benign_idx} from label encoder classes: {classes}")
+        else:
+            # Fallback: try to get from preprocessing_info.json
+            try:
+                import json
+                info_path = os.path.join(orchestrator.config['processed_data_path'], 'preprocessing_info.json')
+                if os.path.exists(info_path):
+                    with open(info_path, 'r') as f:
+                        info = json.load(f)
+                        label_classes = info.get('label_classes', [])
+                        if 'Benign' in label_classes:
+                            benign_idx = label_classes.index('Benign')
+                            logger.debug(f"_detect_for_row: Benign index determined as {benign_idx} from preprocessing_info.json")
+            except Exception as e:
+                logger.warning(f"Could not determine benign_idx from preprocessing_info.json: {e}")
+        
         results = {}
         votes = []
         detection_models = []
@@ -1156,9 +1233,11 @@ def _detect_for_row(X_row, true_label_idx=None, label_encoder=None, original_fea
                     # Unknown or other attack types - assess based on threat status
                     model_severity = "Medium" if is_threat == 1 else "Low"
                 
-                # Add model to detection_models if it detected a threat (for reporting which models detected ANY threat)
+                # Add model to detection_models if it detected a threat
+                # Also track models that correctly identify benign (for reporting)
                 if is_threat == 1:
                     detection_models.append(model_name)
+                # Note: Benign detection tracking is handled in the calling function
                 
                 # Convert details to JSON-serializable format
                 serializable_details = {}
@@ -1214,50 +1293,88 @@ def _detect_for_row(X_row, true_label_idx=None, label_encoder=None, original_fea
         if attack_label is None:
             attack_label = "Unknown"
         
-        # Filter detection_models to only include models that predicted the SAME attack type as the final detected type
-        # This ensures "Detected by" only shows models that matched the final prediction
+        # Filter detection_models based on attack type
+        # For threats: only include models that predicted the SAME attack type
+        # For benign: include models that correctly identified benign
         matching_detection_models = []
+        benign_detection_models = []
+        
         for model_name, model_data in results.items():
             model_predicted_label = model_data.get('attack_label', 'Unknown')
-            if model_predicted_label == attack_label:
-                matching_detection_models.append(model_name)
+            model_is_threat = model_data.get('is_threat', 0) == 1
+            model_pred_idx = model_data.get('pred', -1)
+            
+            if attack_label == "Benign":
+                # For benign: track models that correctly predicted benign
+                # Check both: predicted label is "Benign" AND predicted index matches benign_idx
+                is_correct_benign = (model_predicted_label == "Benign" and 
+                                   model_pred_idx == benign_idx and 
+                                   not model_is_threat)
+                if is_correct_benign:
+                    benign_detection_models.append(model_name)
+                    logger.debug(f"Model {model_name} correctly identified benign: pred_label='{model_predicted_label}', pred_idx={model_pred_idx}, benign_idx={benign_idx}")
+                else:
+                    logger.debug(f"Model {model_name} did NOT identify benign correctly: pred_label='{model_predicted_label}', pred_idx={model_pred_idx}, benign_idx={benign_idx}, is_threat={model_is_threat}")
+            else:
+                # For threats: track models that predicted the same attack type
+                if model_predicted_label == attack_label and model_is_threat:
+                    matching_detection_models.append(model_name)
         
-        detection_models = matching_detection_models
+        # Update detection_models based on whether it's benign or threat
+        if attack_label == "Benign":
+            detection_models = benign_detection_models  # Show models that correctly identified benign
+            logger.info(f"Benign detection: {len(benign_detection_models)} models correctly identified benign: {benign_detection_models}")
+        else:
+            detection_models = matching_detection_models  # Show models that detected the threat
 
-        # Dynamic severity mapping based on attack type characteristics and model agreement
-        severity = "Low"
+        # ========================================================================
+        # REAL-WORLD SEVERITY ASSESSMENT (Attack Type Primary + Confidence Modifier)
+        # ========================================================================
+        # Step 1: Base severity from attack type (PRIMARY FACTOR - 60-70% weight)
+        # Step 2: Adjust based on model confidence (MODIFIER - 20-30% weight)
+        # ========================================================================
         
-        # Categorize attacks by inherent severity (can be adjusted based on domain knowledge)
-        # High severity: Attacks that directly compromise system integrity or data
-        high_severity_attacks = ['DoS', 'DDoS', 'Exploit', 'Rootkit', 'Trojan', 'Virus', 'Worm', 'Backdoor']
+        # Define attack types by inherent threat level
+        high_inherent_severity = ['DoS', 'DDoS', 'Exploit', 'Rootkit', 'Trojan', 'Virus', 'Worm', 'Backdoor']
+        medium_inherent_severity = ['Port Scan', 'HackTool', 'Hoax', 'Botnet', 'Infiltration', 'Web Attack']
         
-        # Medium severity: Attacks that require attention but less immediate
-        medium_severity_attacks = ['Port Scan', 'HackTool', 'Hoax', 'Botnet', 'Infiltration', 'Web Attack']
-        
-        # Use matching_models_count (models that predicted this specific attack type)
-        # instead of votes (models that detected any threat)
         matching_models_count = len(detection_models)
         
-        if attack_label in high_severity_attacks:
-            # For high-severity attacks, severity depends on model confidence
-            if matching_models_count >= 2:  # High confidence - multiple models agree
-                severity = "High"
-            elif matching_models_count == 1:  # Medium confidence - single model detection
-                severity = "High"  # Still high for dangerous attacks even with single detection
-            else:  # Low confidence - using ground truth label but no model predicted it
-                severity = "Medium"  # Less certain but still concerning
-        elif attack_label in medium_severity_attacks:
-            # For medium-severity attacks, more conservative
-            if matching_models_count >= 2:
-                severity = "Medium"
-            elif matching_models_count == 1:
-                severity = "Medium"
-            else:
-                severity = "Low"  # Low confidence on medium-severity attack
+        # Step 1: Determine base severity from attack type (PRIMARY)
+        if attack_label in high_inherent_severity:
+            base_severity = "High"  # Inherently dangerous attacks
+        elif attack_label in medium_inherent_severity:
+            base_severity = "Medium"  # Inherently less dangerous
         elif attack_label == "Benign":
-            severity = "Low"
+            base_severity = "Low"
         else:
-            # Unknown attack types - conservative approach
+            base_severity = "Medium"  # Unknown attacks default to Medium
+        
+        # Step 2: Adjust based on model confidence (MODIFIER)
+        if base_severity == "High":
+            # High-inherent attacks: Stay High unless very low confidence
+            if matching_models_count >= 2:
+                severity = "High"  # High confidence confirms High severity
+            elif matching_models_count == 1:
+                severity = "High"  # Still High (attack type is dangerous, even with 1 model)
+            else:
+                severity = "Medium"  # No models detected - downgrade but still concerning
+                
+        elif base_severity == "Medium":
+            # Medium-inherent attacks: Can be elevated to High with high confidence
+            if matching_models_count >= 3:
+                severity = "High"  # All models agree - upgrade to High
+            elif matching_models_count >= 2:
+                severity = "Medium"  # Majority agree - stays Medium
+            elif matching_models_count == 1:
+                severity = "Medium"  # Single model - stays Medium
+            else:
+                severity = "Low"  # No models detected - downgrade to Low
+                
+        elif base_severity == "Low":
+            severity = "Low"  # Benign always Low
+        else:
+            # Unknown base severity
             if matching_models_count >= 2:
                 severity = "Medium"
             elif matching_models_count == 1:
@@ -1652,7 +1769,20 @@ def stream_next():
             logger.warning(f"IP extraction failed - Meta keys: {list(meta.keys())}, Feature keys: {list(features.keys())[:10]}")
 
         timestamp = datetime.now().isoformat()
-        model_used = ",".join(detection.get('detection_models', [])) if detection.get('detection_models') else "Unknown"
+        detection_models_list = detection.get('detection_models', [])
+        attack_label = detection.get('attack_label', 'Unknown')
+        
+        # Log benign detection for debugging
+        if attack_label == "Benign":
+            logger.info(f"STREAM[{stream_index}] Benign: detection_models={detection_models_list}, count={len(detection_models_list)}")
+            if detection.get('models'):
+                for model_name, model_data in detection.get('models', {}).items():
+                    pred_label = model_data.get('attack_label', 'Unknown')
+                    pred_idx = model_data.get('pred', -1)
+                    is_threat = model_data.get('is_threat', 0)
+                    logger.info(f"  {model_name}: pred='{pred_label}' (idx={pred_idx}), is_threat={is_threat}")
+        
+        model_used = ",".join(detection_models_list) if detection_models_list else "Unknown"
         severity = detection.get('severity', 'Low')
         risk_analysis = detection.get('risk_analysis', '')
 
